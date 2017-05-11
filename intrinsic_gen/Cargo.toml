@@ -1,0 +1,9 @@
+[package]
+authors = ["The Rust Project Developers"]
+name = "intrinsic_gen"
+version = "0.0.0"
+
+[lib]
+path = "lib.rs"
+
+[dependencies]
