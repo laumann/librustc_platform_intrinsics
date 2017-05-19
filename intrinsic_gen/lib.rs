@@ -1,4 +1,6 @@
 
+#![feature(slice_concat_ext)]
+
 #[macro_use]
 extern crate itertools;
 extern crate serde_json;
@@ -9,6 +11,7 @@ use serde_json::Value;
 use std::io::prelude::*;
 use std::path::{Path,PathBuf};
 use std::fs::File;
+use std::slice::SliceConcatExt;
 use parser::*;
 
 pub use parser::*;
@@ -52,7 +55,9 @@ fn render(p: &Platform) -> String {
     if !name.starts_with("{0}") {{ return None }}
     Some(match &name["{0}".len()..] {{"#, p.platform_prefix());
 
-    let body = p.generate();
+    let body : Vec<_> = p.generate().iter().map(ToString::to_string).collect();
+    let body = body.join(",");
+
     let body_end = r#"
 
         _ => return None,
@@ -63,6 +68,9 @@ fn render(p: &Platform) -> String {
     concat(&[HEADER, &body_start, &body, body_end])
 }
 
+
+
+//
 fn concat(strs: &[&str]) -> String {
     let mut output = String::new();
     for s in strs {

@@ -3,6 +3,9 @@ use std::path::Path;
 use std::default::Default;
 use std::io::prelude::*;
 use std::fs::File;
+use std::fmt::{Display,Formatter,Error};
+use std::slice::SliceConcatExt;
+use std::string::ToString;
 
 pub fn parse(p: &Path) -> Platform {
 
@@ -79,8 +82,9 @@ impl Platform {
         }
     }
 
-    pub fn generate(&self) -> String {
-        String::new()
+    // TODO:
+    pub fn generate(&self) -> Vec<OutputItem> {
+        Vec::new()
     }
 }
 
@@ -210,3 +214,39 @@ fn read_array(json: Option<&Value>) -> Vec<String> {
     }
 }
 
+pub struct OutputItem {
+    arm: String,
+    inputs:Vec<TypeVec>,
+    output: TypeVec,
+    definition: String,
+}
+
+pub struct TypeVec(char, i32, i32);
+
+impl Display for OutputItem {
+    fn fmt(&self, f: &mut Formatter) -> Result<(), Error> {
+        write!(f, r#"
+        "{}" => Intrinsic {{
+            inputs: {{ static INPUTS: [&'static Type; {}] = [{}]; &INPUTS }},
+            output: &{},
+            definition: Named("{}")
+        }}
+        "#,
+        self.arm,
+        self.inputs.len(),
+        self.inputs.iter()
+            .map(ToString::to_string)
+            .collect::<Vec<String>>()
+            .join(","),
+        self.output.to_string(),
+        self.definition
+        )
+
+    }
+}
+
+impl Display for TypeVec {
+    fn fmt(&self, f: &mut Formatter) -> Result<(), Error> {
+        write!(f, "::{}{}x{}", self.0, self.1, self.2)
+    }
+}
