@@ -1,15 +1,21 @@
 
 #![feature(slice_concat_ext)]
+#![feature(ascii_ctype)]
 
 #[macro_use]
 extern crate itertools;
+#[macro_use]
+extern crate lazy_static;
+
 extern crate serde_json;
+extern crate regex;
 
 pub mod parser;
+pub mod typespec;
 
 use serde_json::Value;
 use std::io::prelude::*;
-use std::path::{Path,PathBuf};
+use std::path::{Path, PathBuf};
 use std::fs::File;
 use std::slice::SliceConcatExt;
 use parser::*;
@@ -25,7 +31,7 @@ pub fn generate(p: Platform, dir: &Path) {
     file.write_all(output.as_bytes()).unwrap();
 }
 
-static HEADER : &'static str = r#"
+static HEADER: &'static str = r#"
 // Copyright 2015 The Rust Project Developers. See the COPYRIGHT
 // file at the top-level directory of this distribution and at
 // http://rust-lang.org/COPYRIGHT.
@@ -53,9 +59,10 @@ pub fn find(name: &str) -> Option<Intrinsic> {{
 fn render(p: &Platform) -> String {
     let body_start = format!(r#"
     if !name.starts_with("{0}") {{ return None }}
-    Some(match &name["{0}".len()..] {{"#, p.platform_prefix());
+    Some(match &name["{0}".len()..] {{"#,
+                             p.platform_prefix());
 
-    let body : Vec<_> = p.generate().iter().map(ToString::to_string).collect();
+    let body: Vec<_> = p.generate().iter().map(ToString::to_string).collect();
     let body = body.join(",");
 
     let body_end = r#"
