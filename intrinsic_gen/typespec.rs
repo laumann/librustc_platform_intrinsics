@@ -26,21 +26,23 @@ lazy_static! {
         hm
     };
 }
+
+#[derive(Clone)]
 pub struct TypeSpec {
     spec: Vec<String>,
 }
 
 impl TypeSpec {
-    fn from_str(s: &str) -> TypeSpec {
+    pub fn from_str(s: &str) -> TypeSpec {
         let v = vec![s.to_string()];
         TypeSpec { spec: v }
     }
 
-    fn from_list(v: Vec<String>) -> TypeSpec {
-        TypeSpec { spec: v }
+    pub fn from_list(v: &[String]) -> TypeSpec {
+        TypeSpec { spec: v.into() }
     }
 
-    fn enumerate(&self, width: i32, previous: &[Type]) -> Vec<Type> {
+    pub fn enumerate(&self, width: i32, previous: &[Type]) -> Vec<Type> {
 
         let mut result = vec![];
         for spec in &self.spec {
@@ -456,5 +458,25 @@ impl Number {
 }
 
 fn ptrify(caps: &Captures, elem: Type, width: i32, previous: &[Type]) -> Type {
-    unimplemented!()
+    let ptr = caps.name("pointer");
+    if let Some(ptr) = ptr {
+        let llvm_elem =
+        if let Some(llvm_ptr) = caps.name("llvm_pointer") {
+            assert!(llvm_ptr.as_str().starts_with('/'));
+            let mut options = TypeSpec::from_str(&llvm_ptr.as_str()[1..])
+                .enumerate(width, previous);
+            assert!(options.len() == 1);
+            Some(Box::new(options.pop().unwrap()))
+        } else {
+            None
+        };
+        assert!(ptr.as_str() == "Pc" || ptr.as_str() == "Pm");
+        return Type::Pointer {
+            elem: Box::new(elem),
+            llvm_elem: llvm_elem,
+            is_const: ptr.as_str() == "Pc",
+        }
+    } else {
+        return elem;
+    }
 }

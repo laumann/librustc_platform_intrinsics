@@ -7,6 +7,9 @@ use std::fmt::{Display, Formatter, Error};
 use std::slice::SliceConcatExt;
 use std::string::ToString;
 
+use typespec::Type;
+use typespec::TypeSpec;
+
 pub fn parse(p: &Path) -> Platform {
 
     if p.is_dir() {
@@ -98,8 +101,46 @@ impl Platform {
         }
     }
 
-    pub fn monomorphise(&self) {
-        for w in self.widths() {}
+    pub fn monomorphise(&self) -> Vec<MonomorphicIntrinsic> {
+        let mut result = vec![];
+        for s in &self.intrinsicset {
+            for i in &s.intrinsics {
+                let ret = TypeSpec::from_list(&i.ret[..]);
+                let mut args : Vec<_> = i.args.iter().map(|s|TypeSpec::from_str(s)).collect();
+                for w in self.widths() {
+                    assert!(w & (w - 1) == 0);
+                    let p = [];
+                    let mut u = vec![ret.clone()];
+                    u.append(&mut args);
+                    let mut r = recur(w, &p, &u[..]);
+                    result.append(&mut r);
+                }
+            }
+        }
+        return result;
+
+        fn recur(width: i32, processed: &[Type], untouched: &[TypeSpec])
+            -> Vec<MonomorphicIntrinsic>
+        {
+            if untouched.is_empty() {
+                let ret = &processed[0];
+                let args = &processed[1..];
+                //TODO:
+                return vec![];
+            } else {
+                let mut result = vec![];
+                let raw_arg = &untouched[0];
+                let rest = &untouched[1..];
+                for arg in raw_arg.enumerate(width, processed) {
+                    let mut extend : Vec<Type> = processed.into();
+                    extend.push(arg);
+                    for intr in recur(width, &extend[..], rest) {
+                        result.push(intr);
+                    }
+                }
+                return result;
+            }
+        }
     }
 
     // TODO:
@@ -248,7 +289,7 @@ fn read_array(json: Option<&Value>) -> Vec<String> {
 
 struct GenericIntrinsic {}
 
-struct MonomorphicIntrinsic {}
+pub struct MonomorphicIntrinsic {}
 
 pub struct OutputItem {
     arm: String,
