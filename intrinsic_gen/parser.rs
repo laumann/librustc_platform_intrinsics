@@ -113,6 +113,9 @@ impl Platform {
                     let mut u = vec![ret.clone()];
                     u.append(&mut args);
                     let mut r = recur(w, &p, &u[..]);
+                    for mut m in &mut r {
+                        m.update(self, w, s, i);
+                    }
                     result.append(&mut r);
                 }
             }
@@ -125,8 +128,8 @@ impl Platform {
             if untouched.is_empty() {
                 let ret = &processed[0];
                 let args = &processed[1..];
-                //TODO:
-                return vec![];
+                let m = MonomorphicIntrinsic::from_types(ret, args);
+                return vec![m];
             } else {
                 let mut result = vec![];
                 let raw_arg = &untouched[0];
@@ -143,13 +146,12 @@ impl Platform {
         }
     }
 
-    // TODO:
-    pub fn generate(&self) -> Vec<OutputItem> {
-        Vec::new()
+    pub fn generate(&self) -> String {
+        self.monomorphise().iter().map(|m| m.to_string()).collect::<Vec<String>>().join("")
     }
 }
 
-#[derive(Default, Debug)]
+#[derive(Default, Debug, Clone)]
 pub struct PlatformInfo {
     name: String,
     number_info: Vec<NumberInfo>,
@@ -181,7 +183,7 @@ impl PlatformInfo {
     }
 }
 
-#[derive(Debug)]
+#[derive(Default, Debug, Clone)]
 pub struct NumberInfo {
     ty: String,
     props: Value,
@@ -203,10 +205,10 @@ impl NumberInfo {
     }
 }
 
-#[derive(Debug)]
+#[derive(Default, Debug, Clone)]
 pub struct WidthInfo {
     width: i32,
-    props: Value,
+    pub props: Value,
 }
 
 impl WidthInfo {
@@ -225,7 +227,7 @@ impl WidthInfo {
     }
 }
 
-#[derive(Default, Debug)]
+#[derive(Default, Debug, Clone)]
 pub struct IntrinsicSet {
     intrinsic_prefix: String,
     llvm_prefix: String,
@@ -254,7 +256,7 @@ impl IntrinsicSet {
     }
 }
 
-#[derive(Default, Debug)]
+#[derive(Default, Debug, Clone)]
 pub struct IntrinsicData {
     intrinsic: String,
     width: Vec<String>,
@@ -281,26 +283,56 @@ impl IntrinsicData {
 
 fn read_array(json: Option<&Value>) -> Vec<String> {
     match json {
-        Some(&Value::Array(ref arr)) => arr.iter().map(|v| v.to_string()).collect(),
-        Some(&Value::String(ref s)) => vec![s.to_string()],
+        Some(&Value::Array(ref arr)) => arr.iter().map(|v| v.to_string().trim_matches('"').to_string()).collect(),
+        Some(&Value::String(ref s)) => vec![s.to_string().trim_matches('"').to_string()],
         _ => Vec::new(),
     }
 }
 
-struct GenericIntrinsic {}
-
-pub struct MonomorphicIntrinsic {}
-
-pub struct OutputItem {
-    arm: String,
-    inputs: Vec<TypeVec>,
-    output: TypeVec,
-    definition: String,
+#[derive(Debug, Clone)]
+pub struct MonomorphicIntrinsic {
+    intrinsic_set_name: String,
+    platform_prefix: String,
+    len: usize,
+    llvm_name: String,
+    args: Vec<Type>,
+    ret: Type,
 }
 
-pub struct TypeVec(char, i32, i32);
+impl MonomorphicIntrinsic {
+    fn from_types(ret: &Type, args: &[Type]) -> Self {
+        MonomorphicIntrinsic {
+            intrinsic_set_name: Default::default(),
+            platform_prefix: Default::default(),
+            len: 0,
+            llvm_name: Default::default(),
+            ret: ret.clone(),
+            args: args.into(),
+        }
+    }
 
-impl Display for OutputItem {
+    fn update(&mut self, w: i32, p: &Platform, s: &IntrinsicSet, i: &IntrinsicData) {
+        self.intrinsic_set_name = s.intrinsic_prefix.clone()
+                                + &i.intrinsic; // TODO: format
+        self.platform_prefix = p.platform_prefix();
+        self.len = self.args.len();
+        self.llvm_name = if i.llvm.starts_with('!') {
+            i.llvm[1..].into() // TODO: format
+        } else {
+            s.llvm_prefix.clone() + &i.llvm[1..] // TODO: format
+        };
+    }
+
+    fn compiler_args(&self) -> String {
+        self.args.iter().map(|a|a.compiler_ctor_ref()).collect::<Vec<String>>().join(",")
+    }
+
+    fn compiler_ret(&self) -> String {
+        self.ret.compiler_ctor_ref()
+    }
+}
+
+impl Display for MonomorphicIntrinsic {
     fn fmt(&self, f: &mut Formatter) -> Result<(), Error> {
         write!(f,
                r#"
@@ -308,20 +340,17 @@ impl Display for OutputItem {
             inputs: {{ static INPUTS: [&'static Type; {}] = [{}]; &INPUTS }},
             output: &{},
             definition: Named("{}")
-        }}
-        "#,
-               self.arm,
-               self.inputs.len(),
-               self.inputs
-                   .iter()
-                   .map(ToString::to_string)
-                   .collect::<Vec<String>>()
-                   .join(","),
-               self.output.to_string(),
-               self.definition)
+        }}"#,
+               self.intrinsic_set_name,
+               self.len,
+               self.compiler_args(),
+               self.compiler_ret(),
+               self.llvm_name)
 
     }
 }
+
+pub struct TypeVec(char, i32, i32);
 
 impl Display for TypeVec {
     fn fmt(&self, f: &mut Formatter) -> Result<(), Error> {

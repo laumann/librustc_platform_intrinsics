@@ -1,7 +1,12 @@
 use regex::Regex;
 use regex::Captures;
+use serde_json::{self, Value};
 use std::collections::HashMap;
 use std::ascii::AsciiExt;
+use std::collections::BTreeMap;
+use std::ops::Index;
+use parser::PlatformInfo;
+use parser::WidthInfo;
 
 lazy_static! {
     static ref SPEC: Regex = Regex::new(concat!(
@@ -46,6 +51,7 @@ impl TypeSpec {
 
         let mut result = vec![];
         for spec in &self.spec {
+            println!("parsing spec {}", spec);
             let caps = SPEC.captures(&spec);
             if let Some(caps) = caps {
                 let id = caps.name("id");
@@ -160,7 +166,7 @@ impl TypeSpec {
     }
 }
 
-#[derive(Clone)]
+#[derive(Debug, Clone)]
 pub enum Type {
     Void,
     Num(Number),
@@ -177,21 +183,19 @@ pub enum Type {
     Aggregate { flatten: bool, elems: Vec<Type> },
 }
 
-#[derive(Copy, Clone)]
+#[derive(Debug, Copy, Clone)]
 enum NumKind {
     Signed,
     Unsigned,
     Float,
 }
 
-#[derive(Copy, Clone)]
+#[derive(Debug, Copy, Clone)]
 pub struct Number {
     kind: NumKind,
     bitwidth: i32,
     llvm_bitwidth: Option<i32>,
 }
-
-struct PlatformTypeInfo {}
 
 impl Type {
     pub fn bitwidth(&self) -> i32 {
@@ -404,9 +408,20 @@ impl Type {
                     }
                 } else if spec.starts_with("->") {
                     let bitcast_to = TypeSpec::from_str(&spec[2..]);
-                    unimplemented!()
+                    let mut choices = bitcast_to.enumerate(width, previous);
+                    assert!(choices.len() == 1);
+                    Type::Vector {
+                        elem: e,
+                        length: l,
+                        bitcast: choices.pop().map(|c|Box::new(c)),
+                    }
                 } else {
-                    unimplemented!()
+                    let elem = e.modify(spec, width, previous);
+                    Type::Vector {
+                        elem: Box::new(elem),
+                        length: l,
+                        bitcast: None,
+                    }
                 }
             }
             Type::Aggregate {
@@ -455,6 +470,61 @@ impl Number {
         };
         format!("{}{}", m, self.bitwidth)
     }
+
+    pub fn type_info(&self, platform_info: &PlatformInfo) -> PlatformTypeInfo {
+        unimplemented!()
+    }
+}
+
+pub struct PlatformTypeInfo {
+    llvm_name: String,
+    properties: BTreeMap<String, String>,
+    elems: Vec<String>,
+}
+
+impl PlatformTypeInfo {
+    fn vectorize(self, length: i32, width_info: WidthInfo) -> PlatformTypeInfo {
+        let mut props = self.properties;
+        if let Value::Object(ref map) = width_info.props {
+            for (k, v) in map {
+                props.insert(k.to_string(), v.as_str().unwrap_or("").to_string());
+            }
+        }
+        PlatformTypeInfo {
+            llvm_name: format!("v{}{}", length, self.llvm_name),
+            properties: props,
+            elems: vec![],
+        }
+    }
+
+    fn pointer(self, llvm_elem: Option<&PlatformTypeInfo>) -> PlatformTypeInfo {
+        let name = if let Some(ref p) = llvm_elem {
+            p.llvm_name.clone()
+        } else {
+            self.llvm_name
+        };
+        PlatformTypeInfo {
+            llvm_name: format!("p0{}", name),
+            properties: self.properties,
+            elems: vec![]
+        }
+    }
+}
+
+impl Index<String> for PlatformTypeInfo {
+    type Output = str;
+
+    fn index(&self, i: String) -> &str {
+        &self.properties[&*i]
+    }
+}
+
+impl Index<usize> for PlatformTypeInfo {
+    type Output = str;
+
+    fn index(&self, i: usize) -> &str {
+        &self.elems[i]
+    }
 }
 
 fn ptrify(caps: &Captures, elem: Type, width: i32, previous: &[Type]) -> Type {
@@ -480,3 +550,5 @@ fn ptrify(caps: &Captures, elem: Type, width: i32, previous: &[Type]) -> Type {
         return elem;
     }
 }
+
+

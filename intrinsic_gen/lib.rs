@@ -62,15 +62,14 @@ fn render(p: &Platform) -> String {
     Some(match &name["{0}".len()..] {{"#,
                              p.platform_prefix());
 
-    let body: Vec<_> = p.generate().iter().map(ToString::to_string).collect();
-    let body = body.join(",");
+    let body = p.generate();
 
     let body_end = r#"
 
         _ => return None,
     })
 }
-    "#;
+"#;
 
     concat(&[HEADER, &body_start, &body, body_end])
 }
