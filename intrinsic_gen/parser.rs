@@ -228,11 +228,25 @@ impl IntrinsicSet {
     pub fn from_json(json: &Value) -> IntrinsicSet {
         let mut data = IntrinsicSet::default();
         data.intrinsic_prefix = json.get("intrinsic_prefix")
-            .map(|s| s.to_string())
-            .unwrap_or_else(String::new);
+            .map_or(Some(String::new()), |s| match *s {
+                Value::String(ref s) => Some(s.clone()),
+                Value::Null => Some(String::new()),
+                _ => {
+                    println!("cargo:warning=Got {:?}", s);
+                    None
+                }
+            })
+            .expect("expected a string value for field intrinsic_prefix");
         data.llvm_prefix = json.get("llvm_prefix")
-            .map(|s| s.to_string())
-            .unwrap_or_else(String::new);
+            .map_or(Some(String::new()), |s| match *s {
+                Value::String(ref s) => Some(s.clone()),
+                Value::Null => Some(String::new()),
+                _ =>  {
+                    println!("cargo:warning=Got {:?}", s);
+                    None
+                }
+            })
+            .expect("expected a string value for field llvm_prefix");
 
         let intrisics = json.get("intrinsics");
         if let Some(&Value::Array(ref arr)) = intrisics {
@@ -258,8 +272,15 @@ impl IntrinsicData {
     pub fn from_json(json: &Value) -> IntrinsicData {
         IntrinsicData {
             intrinsic: json.get("intrinsic")
-                .map(|s| s.to_string())
-                .unwrap_or_else(String::new),
+                .map_or(Some(String::new()), |s| match *s {
+                    Value::String(ref s) => Some(s.clone()),
+                    Value::Null => Some(String::new()),
+                    _ =>  {
+                        println!("cargo:warning=Got {:?}", s);
+                        None
+                    }
+                })
+                .expect("expected a string value for field llvm_prefix"),
             width: read_array(json.get("width")),
             llvm: json.get("llvm").map(|s| s.to_string()).unwrap_or_else(String::new),
             ret: read_array(json.get("ret")),
@@ -303,7 +324,7 @@ impl MonomorphicIntrinsic {
     }
 
     fn update(&mut self, w: i32, p: &Platform, s: &IntrinsicSet, i: &IntrinsicData) {
-        self.intrinsic_set_name = s.intrinsic_prefix.clone() + &i.intrinsic; // TODO: format
+        self.intrinsic_set_name = format!("{}{}", s.intrinsic_prefix, i.intrinsic);
         self.platform_prefix = p.platform_prefix();
         self.len = self.args.len();
         self.llvm_name = if i.llvm.starts_with('!') {
