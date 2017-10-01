@@ -86,23 +86,45 @@ impl Platform {
     }
 
     pub fn platform_prefix(&self) -> String {
-        if let Some(ref p) = self.platform {
-            p.name.clone()
-        } else {
-            String::new()
-        }
+        self.platform
+            .as_ref()
+            .map(|p| p.name.clone())
+            .unwrap_or_else(String::new)
     }
 
     fn widths(&self) -> Vec<i32> {
-        if let Some(ref p) = self.platform {
-            p.width_info.iter().map(|w| w.width).collect()
-        } else {
-            vec![]
-        }
+        self.platform
+            .as_ref()
+            .map(|p| p.width_info.iter().map(|w| w.width).collect())
+            .unwrap_or_else(|| vec![])
     }
 
     pub fn monomorphise(&self) -> Vec<MonomorphicIntrinsic> {
         let mut result = vec![];
+
+        fn recur(width: i32,
+                 processed: &[Type],
+                 untouched: &[TypeSpec]) -> Vec<MonomorphicIntrinsic> {
+            if untouched.is_empty() {
+                let ret = &processed[0];
+                let args = &processed[1..];
+                let m = MonomorphicIntrinsic::from_types(ret, args);
+                vec![m]
+            } else {
+                let mut result = vec![];
+                let raw_arg = &untouched[0];
+                let rest = &untouched[1..];
+                for arg in raw_arg.enumerate(width, processed) {
+                    let mut extend : Vec<Type> = processed.into();
+                    extend.push(arg);
+                    for intr in recur(width, &extend[..], rest) {
+                        result.push(intr);
+                    }
+                }
+                result
+            }
+        }
+
         for s in &self.intrinsicset {
             for i in &s.intrinsics {
                 let ret = TypeSpec::from_list(&i.ret[..]);
@@ -120,30 +142,7 @@ impl Platform {
                 }
             }
         }
-        return result;
-
-        fn recur(width: i32, processed: &[Type], untouched: &[TypeSpec])
-            -> Vec<MonomorphicIntrinsic>
-        {
-            if untouched.is_empty() {
-                let ret = &processed[0];
-                let args = &processed[1..];
-                let m = MonomorphicIntrinsic::from_types(ret, args);
-                return vec![m];
-            } else {
-                let mut result = vec![];
-                let raw_arg = &untouched[0];
-                let rest = &untouched[1..];
-                for arg in raw_arg.enumerate(width, processed) {
-                    let mut extend : Vec<Type> = processed.into();
-                    extend.push(arg);
-                    for intr in recur(width, &extend[..], rest) {
-                        result.push(intr);
-                    }
-                }
-                return result;
-            }
-        }
+        result
     }
 
     pub fn generate(&self) -> String {
@@ -163,23 +162,11 @@ impl PlatformInfo {
         let p = json.get("platform");
         let n = json.get("number_info");
         let w = json.get("width_info");
-        if let Some(p) = p {
-            Some(PlatformInfo {
-                     name: p.to_string(),
-                     number_info: if let Some(n) = n {
-                         NumberInfo::from_json(n)
-                     } else {
-                         vec![]
-                     },
-                     width_info: if let Some(w) = w {
-                         WidthInfo::from_json(w)
-                     } else {
-                         vec![]
-                     },
-                 })
-        } else {
-            None
-        }
+        p.map(|p| PlatformInfo {
+            name: p.to_string(),
+            number_info: n.map(NumberInfo::from_json).unwrap_or_else(Vec::new),
+            width_info: w.map(WidthInfo::from_json).unwrap_or_else(Vec::new),
+        })
     }
 }
 
@@ -201,7 +188,7 @@ impl NumberInfo {
                 res.push(item);
             }
         }
-        return res;
+        res
     }
 }
 
@@ -223,7 +210,7 @@ impl WidthInfo {
                 res.push(item);
             }
         }
-        return res;
+        res
     }
 }
 
@@ -239,10 +226,10 @@ impl IntrinsicSet {
         let mut data = IntrinsicSet::default();
         data.intrinsic_prefix = json.get("intrinsic_prefix")
             .map(|s| s.to_string())
-            .unwrap_or(String::new());
+            .unwrap_or_else(String::new);
         data.llvm_prefix = json.get("llvm_prefix")
             .map(|s| s.to_string())
-            .unwrap_or(String::new());
+            .unwrap_or_else(String::new);
 
         let intrisics = json.get("intrinsics");
         if let Some(&Value::Array(ref arr)) = intrisics {
@@ -251,8 +238,7 @@ impl IntrinsicSet {
                 data.intrinsics.push(i);
             }
         }
-
-        return data;
+        data
     }
 }
 
@@ -270,11 +256,11 @@ impl IntrinsicData {
         IntrinsicData {
             intrinsic: json.get("intrinsic")
                 .map(|s| s.to_string())
-                .unwrap_or(String::new()),
+                .unwrap_or_else(String::new),
             width: read_array(json.get("width")),
             llvm: json.get("llvm")
                 .map(|s| s.to_string())
-                .unwrap_or(String::new()),
+                .unwrap_or_else(String::new),
             ret: read_array(json.get("ret")),
             args: read_array(json.get("args")),
         }
