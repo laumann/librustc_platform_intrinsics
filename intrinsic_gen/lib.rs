@@ -3,8 +3,6 @@
 #![feature(ascii_ctype)]
 
 #[macro_use]
-extern crate itertools;
-#[macro_use]
 extern crate lazy_static;
 
 extern crate serde_json;

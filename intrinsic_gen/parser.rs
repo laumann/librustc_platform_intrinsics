@@ -114,7 +114,7 @@ impl Platform {
                     u.append(&mut args);
                     let mut r = recur(w, &p, &u[..]);
                     for mut m in &mut r {
-                        m.update(self, w, s, i);
+                        m.update(w, self, s, i);
                     }
                     result.append(&mut r);
                 }
