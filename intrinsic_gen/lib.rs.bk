@@ -59,8 +59,7 @@ fn render(p: &Platform) -> String {
     let body_start = format!(r#"
     if !name.starts_with("{0}") {{ return None }}
     Some(match &name["{0}".len()..] {{"#,
-        p.platform_prefix()
-    );
+                             p.platform_prefix());
 
     let body = p.generate();
 
@@ -71,5 +70,16 @@ fn render(p: &Platform) -> String {
 }
 "#;
 
-    [HEADER, &body_start, &body, body_end].concat()
+    concat(&[HEADER, &body_start, &body, body_end])
+}
+
+
+
+//
+fn concat(strs: &[&str]) -> String {
+    let mut output = String::new();
+    for s in strs {
+        output.push_str(s);
+    }
+    output
 }

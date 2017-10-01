@@ -78,8 +78,10 @@ impl TypeSpec {
                 } else if let Some(id) = id {
                     let id = id.as_str().chars().next().unwrap();
                     let is_vector = id.is_ascii_lowercase();
-                    let type_ctors = TYPE_ID_LOOKUP.get(&id.to_ascii_lowercase()).expect(
-                        &format!("find TYPE_ID {} failed", id.to_ascii_lowercase()));
+                    let type_ctors =
+                        TYPE_ID_LOOKUP
+                            .get(&id.to_ascii_lowercase())
+                            .expect(&format!("find TYPE_ID {} failed", id.to_ascii_lowercase()));
 
                     let (start, end, llvm_width);
                     if let Some(s) = caps.name("start") {
@@ -141,7 +143,8 @@ impl TypeSpec {
                     }
                     result.push(ptrify(&caps, ret, width, &previous));
                 } else {
-                    panic!("matched `{}`, but didn\'t understand it?", spec);
+                    assert!(false,
+                            format!("matched `{}`, but didn\'t understand it?", spec))
                 }
             } else if spec.starts_with('(') {
                 let len = spec.len();
@@ -152,7 +155,7 @@ impl TypeSpec {
                 } else {
                     panic!("found unclosed aggregate {}", spec)
                 };
-            // TODO
+                // TODO
             } else if spec.starts_with('[') {
                 // TODO
             } else {
@@ -243,9 +246,9 @@ impl Type {
                 let parts = format!("{{ static PARTS: [&'static Type; {}] = [{}]; &PARTS }}",
                                     e.len(),
                                     e.iter()
-                                    .map(|ref x| x.compiler_ctor_ref())
-                                    .collect::<Vec<String>>()
-                                    .join(", "));
+                                        .map(|ref x| x.compiler_ctor_ref())
+                                        .collect::<Vec<String>>()
+                                        .join(", "));
                 format!("Type::Aggregate({}, {})", f, parts)
             }
         }
@@ -283,10 +286,13 @@ impl Type {
             &Type::Aggregate {
                 flatten: f,
                 elems: ref e,
-            } => format!("({})", e.iter()
-                         .map(|ref x| x.rust_name())
-                         .collect::<Vec<String>>()
-                         .join(", "))
+            } => {
+                format!("({})",
+                        e.iter()
+                            .map(|ref x| x.rust_name())
+                            .collect::<Vec<String>>()
+                            .join(", "))
+            }
         }
     }
 
@@ -295,36 +301,48 @@ impl Type {
             Type::Void => self,
             Type::Num(ref n) => {
                 match spec {
-                    "u" => Type::Num(Number {
-                        kind: NumKind::Unsigned,
-                        bitwidth: n.bitwidth,
-                        llvm_bitwidth: None,
-                    }),
-                    "s" => Type::Num(Number {
-                        kind: NumKind::Signed,
-                        bitwidth: n.bitwidth,
-                        llvm_bitwidth: None,
-                    }),
-                    "f" => Type::Num(Number {
-                        kind: NumKind::Float,
-                        bitwidth: n.bitwidth,
-                        llvm_bitwidth: None,
-                    }),
-                    "w" => Type::Num(Number {
-                        kind: n.kind,
-                        bitwidth: n.bitwidth * 2,
-                        llvm_bitwidth: None,
-                    }),
-                    "n" => Type::Num(Number {
-                        kind: n.kind,
-                        bitwidth: n.bitwidth / 2,
-                        llvm_bitwidth: None,
-                    }),
-                    "v" => Type::Vector {
-                        elem: Box::new(self.clone()),
-                        length: width / n.bitwidth,
-                        bitcast: None,
-                    },
+                    "u" => {
+                        Type::Num(Number {
+                                      kind: NumKind::Unsigned,
+                                      bitwidth: n.bitwidth,
+                                      llvm_bitwidth: None,
+                                  })
+                    }
+                    "s" => {
+                        Type::Num(Number {
+                                      kind: NumKind::Signed,
+                                      bitwidth: n.bitwidth,
+                                      llvm_bitwidth: None,
+                                  })
+                    }
+                    "f" => {
+                        Type::Num(Number {
+                                      kind: NumKind::Float,
+                                      bitwidth: n.bitwidth,
+                                      llvm_bitwidth: None,
+                                  })
+                    }
+                    "w" => {
+                        Type::Num(Number {
+                                      kind: n.kind,
+                                      bitwidth: n.bitwidth * 2,
+                                      llvm_bitwidth: None,
+                                  })
+                    }
+                    "n" => {
+                        Type::Num(Number {
+                                      kind: n.kind,
+                                      bitwidth: n.bitwidth / 2,
+                                      llvm_bitwidth: None,
+                                  })
+                    }
+                    "v" => {
+                        Type::Vector {
+                            elem: Box::new(self.clone()),
+                            length: width / n.bitwidth,
+                            bitcast: None,
+                        }
+                    }
                     _ => panic!("unknown modification spec {}", spec),
                 }
             }
@@ -335,21 +353,27 @@ impl Type {
             } => {
                 match spec {
                     "D" => *e,
-                    "M" => Type::Pointer {
-                        elem: e,
-                        llvm_elem: le,
-                        is_const: false,
-                    },
-                    "C" => Type::Pointer {
-                        elem: e,
-                        llvm_elem: le,
-                        is_const: true,
-                    },
-                    _ => Type::Pointer {
-                        elem: Box::new(e.modify(spec, width, previous)),
-                        llvm_elem: le,
-                        is_const: c,
-                    },
+                    "M" => {
+                        Type::Pointer {
+                            elem: e,
+                            llvm_elem: le,
+                            is_const: false,
+                        }
+                    }
+                    "C" => {
+                        Type::Pointer {
+                            elem: e,
+                            llvm_elem: le,
+                            is_const: true,
+                        }
+                    }
+                    _ => {
+                        Type::Pointer {
+                            elem: Box::new(e.modify(spec, width, previous)),
+                            llvm_elem: le,
+                            is_const: c,
+                        }
+                    }
                 }
             }
             Type::Vector {
@@ -372,7 +396,10 @@ impl Type {
                         bitcast: None,
                     }
                 } else if spec.starts_with('x') {
-                    let new_bitwidth: i32 = spec[1..].parse().expect("spec starts with 'x', but no integer followed");
+                    let new_bitwidth: i32 =
+                        spec[1..]
+                            .parse()
+                            .expect("spec starts with 'x', but no integer followed");
                     let bw = e.bitwidth();
                     Type::Vector {
                         elem: e,
@@ -386,7 +413,7 @@ impl Type {
                     Type::Vector {
                         elem: e,
                         length: l,
-                        bitcast: choices.pop().map(Box::new),
+                        bitcast: choices.pop().map(|c|Box::new(c)),
                     }
                 } else {
                     let elem = e.modify(spec, width, previous);
@@ -402,7 +429,9 @@ impl Type {
                 elems: e,
             } => {
                 if spec.starts_with('.') {
-                    let num: usize = spec[1..].parse().expect("spec starts with '.', but no integer followed");
+                    let num: usize = spec[1..]
+                        .parse()
+                        .expect("spec starts with '.', but no integer followed");
                     e[num].clone()
                 } else {
                     unimplemented!()
@@ -415,16 +444,20 @@ impl Type {
 impl Number {
     pub fn compiler_ctor(&self) -> String {
         match self.kind {
-            NumKind::Signed => if let Some(lw) = self.llvm_bitwidth {
-                format!("::I{}_{}", self.bitwidth, lw)
-            } else {
-                format!("::I{}", self.bitwidth)
-            },
-            NumKind::Unsigned => if let Some(lw) = self.llvm_bitwidth {
-                format!("::U{}_{}", self.bitwidth, lw)
-            } else {
-                format!("::U{}", self.bitwidth)
-            },
+            NumKind::Signed => {
+                if let Some(lw) = self.llvm_bitwidth {
+                    format!("::I{}_{}", self.bitwidth, lw)
+                } else {
+                    format!("::I{}", self.bitwidth)
+                }
+            }
+            NumKind::Unsigned => {
+                if let Some(lw) = self.llvm_bitwidth {
+                    format!("::U{}_{}", self.bitwidth, lw)
+                } else {
+                    format!("::U{}", self.bitwidth)
+                }
+            }
             NumKind::Float => format!("::F{}", self.bitwidth),
         }
     }
@@ -473,7 +506,7 @@ impl PlatformTypeInfo {
         PlatformTypeInfo {
             llvm_name: format!("p0{}", name),
             properties: self.properties,
-            elems: vec![],
+            elems: vec![]
         }
     }
 }
@@ -497,10 +530,11 @@ impl Index<usize> for PlatformTypeInfo {
 fn ptrify(caps: &Captures, elem: Type, width: i32, previous: &[Type]) -> Type {
     let ptr = caps.name("pointer");
     if let Some(ptr) = ptr {
-        let llvm_elem = if let Some(llvm_ptr) = caps.name("llvm_pointer") {
+        let llvm_elem =
+        if let Some(llvm_ptr) = caps.name("llvm_pointer") {
             assert!(llvm_ptr.as_str().starts_with('/'));
-            let mut options =
-                TypeSpec::from_str(&llvm_ptr.as_str()[1..]).enumerate(width, previous);
+            let mut options = TypeSpec::from_str(&llvm_ptr.as_str()[1..])
+                .enumerate(width, previous);
             assert!(options.len() == 1);
             Some(Box::new(options.pop().unwrap()))
         } else {
@@ -511,8 +545,10 @@ fn ptrify(caps: &Captures, elem: Type, width: i32, previous: &[Type]) -> Type {
             elem: Box::new(elem),
             llvm_elem: llvm_elem,
             is_const: ptr.as_str() == "Pc",
-        };
+        }
     } else {
         return elem;
     }
 }
+
+

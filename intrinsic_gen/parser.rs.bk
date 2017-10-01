@@ -29,7 +29,8 @@ fn parse_dir(path: &Path) -> Platform {
     result.file_stem = file_stem;
 
     if path.is_dir() {
-        let files = path.read_dir().expect(&format!("read_dir {:?} failed", path));
+        let files = path.read_dir()
+            .expect(&format!("read_dir {:?} failed", path));
         for entry in files {
             if let Ok(entry) = entry {
                 result.merge(parse_file(&entry.path()));
@@ -51,9 +52,10 @@ fn parse_file(path: &Path) -> Platform {
         .unwrap();
     println!("Parse file {:?} , file name {:?}", path, file_stem);
 
-    f.read_to_string(&mut buffer).expect(&format!("read file {:?} failed", path));
-    let json: Value =
-        serde_json::from_str(&buffer).expect(&format!("parse json failed in file {:?}", path));
+    f.read_to_string(&mut buffer)
+        .expect(&format!("read file {:?} failed", path));
+    let json: Value = serde_json::from_str(&buffer)
+        .expect(&format!("parse json failed in file {:?}", path));
 
     let mut p = Platform::from_json(&json);
     p.file_stem = file_stem;
@@ -102,8 +104,7 @@ impl Platform {
 
         fn recur(width: i32,
                  processed: &[Type],
-                 untouched: &[TypeSpec])
-                 -> Vec<MonomorphicIntrinsic> {
+                 untouched: &[TypeSpec]) -> Vec<MonomorphicIntrinsic> {
             if untouched.is_empty() {
                 let ret = &processed[0];
                 let args = &processed[1..];
@@ -114,7 +115,7 @@ impl Platform {
                 let raw_arg = &untouched[0];
                 let rest = &untouched[1..];
                 for arg in raw_arg.enumerate(width, processed) {
-                    let mut extend: Vec<Type> = processed.into();
+                    let mut extend : Vec<Type> = processed.into();
                     extend.push(arg);
                     for intr in recur(width, &extend[..], rest) {
                         result.push(intr);
@@ -127,7 +128,7 @@ impl Platform {
         for s in &self.intrinsicset {
             for i in &s.intrinsics {
                 let ret = TypeSpec::from_list(&i.ret[..]);
-                let mut args: Vec<_> = i.args.iter().map(|s| TypeSpec::from_str(s)).collect();
+                let mut args : Vec<_> = i.args.iter().map(|s|TypeSpec::from_str(s)).collect();
                 for w in self.widths() {
                     assert!(w & (w - 1) == 0);
                     let p = [];
@@ -145,11 +146,7 @@ impl Platform {
     }
 
     pub fn generate(&self) -> String {
-        self.monomorphise()
-            .iter()
-            .map(|m| m.to_string())
-            .collect::<Vec<String>>()
-            .join("")
+        self.monomorphise().iter().map(|m| m.to_string()).collect::<Vec<String>>().join("")
     }
 }
 
@@ -261,7 +258,9 @@ impl IntrinsicData {
                 .map(|s| s.to_string())
                 .unwrap_or_else(String::new),
             width: read_array(json.get("width")),
-            llvm: json.get("llvm").map(|s| s.to_string()).unwrap_or_else(String::new),
+            llvm: json.get("llvm")
+                .map(|s| s.to_string())
+                .unwrap_or_else(String::new),
             ret: read_array(json.get("ret")),
             args: read_array(json.get("args")),
         }
@@ -270,11 +269,7 @@ impl IntrinsicData {
 
 fn read_array(json: Option<&Value>) -> Vec<String> {
     match json {
-        Some(&Value::Array(ref arr)) => {
-            arr.iter()
-                .map(|v| v.to_string().trim_matches('"').to_string())
-                .collect()
-        }
+        Some(&Value::Array(ref arr)) => arr.iter().map(|v| v.to_string().trim_matches('"').to_string()).collect(),
         Some(&Value::String(ref s)) => vec![s.to_string().trim_matches('"').to_string()],
         _ => Vec::new(),
     }
@@ -303,7 +298,8 @@ impl MonomorphicIntrinsic {
     }
 
     fn update(&mut self, w: i32, p: &Platform, s: &IntrinsicSet, i: &IntrinsicData) {
-        self.intrinsic_set_name = s.intrinsic_prefix.clone() + &i.intrinsic; // TODO: format
+        self.intrinsic_set_name = s.intrinsic_prefix.clone()
+                                + &i.intrinsic; // TODO: format
         self.platform_prefix = p.platform_prefix();
         self.len = self.args.len();
         self.llvm_name = if i.llvm.starts_with('!') {
@@ -314,11 +310,7 @@ impl MonomorphicIntrinsic {
     }
 
     fn compiler_args(&self) -> String {
-        self.args
-            .iter()
-            .map(|a| a.compiler_ctor_ref())
-            .collect::<Vec<String>>()
-            .join(",")
+        self.args.iter().map(|a|a.compiler_ctor_ref()).collect::<Vec<String>>().join(",")
     }
 
     fn compiler_ret(&self) -> String {
@@ -329,18 +321,17 @@ impl MonomorphicIntrinsic {
 impl Display for MonomorphicIntrinsic {
     fn fmt(&self, f: &mut Formatter) -> Result<(), Error> {
         write!(f,
-            r#"
+               r#"
         "{}" => Intrinsic {{
             inputs: {{ static INPUTS: [&'static Type; {}] = [{}]; &INPUTS }},
             output: &{},
             definition: Named("{}")
         }}"#,
-            self.intrinsic_set_name,
-            self.len,
-            self.compiler_args(),
-            self.compiler_ret(),
-            self.llvm_name
-        )
+               self.intrinsic_set_name,
+               self.len,
+               self.compiler_args(),
+               self.compiler_ret(),
+               self.llvm_name)
 
     }
 }
