@@ -57,8 +57,8 @@ pub fn find(name: &str) -> Option<Intrinsic> {
 
 fn render(p: &Platform) -> String {
     let body_start = format!(r#"
-    if !name.starts_with("{0}") {{ return None }}
-    Some(match &name["{0}".len()..] {{"#,
+    if !name.starts_with({0}) {{ return None }}
+    Some(match &name[{0}.len()..] {{"#,
         p.platform_prefix()
     );
 

@@ -353,9 +353,9 @@ impl Display for MonomorphicIntrinsic {
             r#"
         "{}" => Intrinsic {{
             inputs: {{ static INPUTS: [&'static Type; {}] = [{}]; &INPUTS }},
-            output: &{},
-            definition: Named("{}")
-        }}"#,
+            output: {},
+            definition: Named("{})
+        }},"#,
             self.intrinsic_set_name,
             self.len,
             self.compiler_args(),

@@ -11,7 +11,7 @@ fn main() {
     input.push("tests/input");
 
     let mut output = PathBuf::from(&dir);
-    output.push("tests/output");
+    //output.push("tests/output");
 
     let files = input.read_dir().expect("read_dir failed");
     for entry in files {
