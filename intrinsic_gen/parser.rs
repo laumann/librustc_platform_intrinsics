@@ -282,7 +282,16 @@ impl IntrinsicData {
                 })
                 .expect("expected a string value for field llvm_prefix"),
             width: read_array(json.get("width")),
-            llvm: json.get("llvm").map(|s| s.to_string()).unwrap_or_else(String::new),
+            llvm: json.get("llvm")
+                .map_or(Some(String::new()), |s| match *s {
+                    Value::String(ref s) => Some(s.clone()),
+                    Value::Null => Some(String::new()),
+                    _ => {
+                        println!("cargo:warning=Got {:?}", s);
+                        None
+                    }
+                })
+                .expect("expected a string value for field llvm"),
             ret: read_array(json.get("ret")),
             args: read_array(json.get("args")),
         }
@@ -328,6 +337,7 @@ impl MonomorphicIntrinsic {
         self.platform_prefix = p.platform_prefix();
         self.len = self.args.len();
         self.llvm_name = if i.llvm.starts_with('!') {
+            // FIXME(laumann): What does the ! mean?
             i.llvm[1..].into() // TODO: format
         } else {
             s.llvm_prefix.clone() + &i.llvm[1..] // TODO: format
@@ -354,7 +364,7 @@ impl Display for MonomorphicIntrinsic {
         "{}" => Intrinsic {{
             inputs: {{ static INPUTS: [&'static Type; {}] = [{}]; &INPUTS }},
             output: {},
-            definition: Named("{})
+            definition: Named("{}")
         }},"#,
             self.intrinsic_set_name,
             self.len,
